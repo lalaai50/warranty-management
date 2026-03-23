@@ -711,9 +711,101 @@ export default function Home() {
             {/* 查询结果 */}
             {searchResults.length > 0 && (
               <div className="space-y-4">
+                {/* 站点状态汇总 */}
+                {(() => {
+                  const inWarrantyRecords = searchResults.filter(r => r.warranty_status_display === '在保');
+                  const outOfWarrantyRecords = searchResults.filter(r => r.warranty_status_display === '过保');
+                  const inWarrantyCount = inWarrantyRecords.length;
+                  const outOfWarrantyCount = outOfWarrantyRecords.length;
+                  
+                  return (
+                    <>
+                      {/* 整站状态提示 */}
+                      {inWarrantyCount === searchResults.length && (
+                        <Card className="border-green-500 bg-green-50 dark:bg-green-900/20">
+                          <CardContent className="pt-4">
+                            <div className="flex items-center gap-3">
+                              <CheckCircle className="w-8 h-8 text-green-600" />
+                              <div>
+                                <p className="text-lg font-bold text-green-700 dark:text-green-400">整站在保</p>
+                                <p className="text-sm text-green-600 dark:text-green-300">
+                                  该站点所有 {searchResults.length} 台设备均在保修期内
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      
+                      {outOfWarrantyCount === searchResults.length && (
+                        <Card className="border-red-500 bg-red-50 dark:bg-red-900/20">
+                          <CardContent className="pt-4">
+                            <div className="flex items-center gap-3">
+                              <AlertCircle className="w-8 h-8 text-red-600" />
+                              <div>
+                                <p className="text-lg font-bold text-red-700 dark:text-red-400">整站过保</p>
+                                <p className="text-sm text-red-600 dark:text-red-300">
+                                  该站点所有 {searchResults.length} 台设备均已过保修期，需要续保或维修
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                      
+                      {inWarrantyCount > 0 && outOfWarrantyCount > 0 && (
+                        <Card className="border-orange-500 bg-orange-50 dark:bg-orange-900/20">
+                          <CardContent className="pt-4">
+                            <div className="flex items-center gap-3 mb-4">
+                              <AlertCircle className="w-8 h-8 text-orange-600" />
+                              <div>
+                                <p className="text-lg font-bold text-orange-700 dark:text-orange-400">部分过保</p>
+                                <p className="text-sm text-orange-600 dark:text-orange-300">
+                                  该站点共 {searchResults.length} 台设备，其中 {inWarrantyCount} 台在保，{outOfWarrantyCount} 台过保
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* 设备分类列表 */}
+                            <div className="space-y-3">
+                              {/* 在保设备 */}
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3">
+                                <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
+                                  ✓ 在保设备 ({inWarrantyCount} 台)
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {inWarrantyRecords.map((r, idx) => (
+                                    <span key={idx} className="inline-flex items-center px-2 py-1 rounded text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                      {r.device_name || r.pile_number || r.after_sales_code}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              {/* 过保设备 */}
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3">
+                                <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
+                                  ✗ 过保设备 ({outOfWarrantyCount} 台)
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {outOfWarrantyRecords.map((r, idx) => (
+                                    <span key={idx} className="inline-flex items-center px-2 py-1 rounded text-xs bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                      {r.device_name || r.pile_number || r.after_sales_code}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  );
+                })()}
+                
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    查询结果 ({searchResults.length} 条)
+                    设备明细 ({searchResults.length} 条)
                   </h3>
                 </div>
                 
