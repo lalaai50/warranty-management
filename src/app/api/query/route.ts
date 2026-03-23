@@ -33,13 +33,19 @@ export async function GET(request: NextRequest) {
     // 判断质保状态
     const now = new Date();
     const recordsWithStatus = data?.map((record) => {
-      const endDate = new Date(record.warranty_end_date);
-      const isWarrantyValid = endDate >= now;
+      let isWarrantyValid = false;
+      let daysRemaining = 0;
+      
+      if (record.warranty_end_date) {
+        const endDate = new Date(record.warranty_end_date);
+        isWarrantyValid = endDate >= now;
+        daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      }
       
       return {
         ...record,
-        warranty_status: isWarrantyValid ? '在保' : '过保',
-        days_remaining: Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+        warranty_status_display: isWarrantyValid ? '在保' : '过保',
+        days_remaining: daysRemaining,
       };
     }) || [];
 

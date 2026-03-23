@@ -7,47 +7,63 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Search, FileText, Calendar, Building2, AlertCircle, CheckCircle, Download } from 'lucide-react';
+import { Upload, Search, FileText, MapPin, AlertCircle, CheckCircle, Download, Calendar, Building2, Zap, Factory } from 'lucide-react';
 
 interface WarrantyRecord {
   id: number;
   file_name: string;
   file_url: string;
+  after_sales_code: string;
+  warranty_status: string;
+  factory_date: string;
+  factory_number: string;
+  pile_number: string;
+  product_code: string;
+  device_type: string;
+  device_name: string;
+  product_model: string;
+  manufacturer: string;
   station_name: string;
+  province: string;
+  city: string;
+  district: string;
+  station_address: string;
+  customer: string;
+  maintainer: string;
+  warranty_period: string;
+  warranty_start_date: string;
   warranty_end_date: string;
   created_at: string;
-  warranty_status: string;
+  warranty_status_display: string;
   days_remaining: number;
 }
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('upload');
   const [file, setFile] = useState<File | null>(null);
-  const [stationName, setStationName] = useState('');
-  const [warrantyEndDate, setWarrantyEndDate] = useState('');
   const [searchStationName, setSearchStationName] = useState('');
   const [records, setRecords] = useState<WarrantyRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [uploadStats, setUploadStats] = useState<{ total: number; inserted: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 文件上传
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!file || !stationName || !warrantyEndDate) {
-      setMessage({ type: 'error', text: '请填写所有必填项' });
+    if (!file) {
+      setMessage({ type: 'error', text: '请选择要上传的文件' });
       return;
     }
 
     setLoading(true);
     setMessage(null);
+    setUploadStats(null);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('stationName', stationName);
-      formData.append('warrantyEndDate', warrantyEndDate);
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -57,10 +73,12 @@ export default function Home() {
       const result = await response.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: '上传成功！' });
+        setUploadStats({
+          total: result.data.totalRecords,
+          inserted: result.data.insertedRecords,
+        });
+        setMessage({ type: 'success', text: `成功上传并解析 ${result.data.insertedRecords} 条记录！` });
         setFile(null);
-        setStationName('');
-        setWarrantyEndDate('');
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -128,11 +146,11 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-              <FileText className="w-6 h-6 text-white" />
+              <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">设备质保管理系统</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">文件上传与质保查询</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">设备维保管理系统</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">充电桩设备质保查询</p>
             </div>
           </div>
         </div>
@@ -144,11 +162,11 @@ export default function Home() {
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
-              文件上传
+              上传 Excel
             </TabsTrigger>
             <TabsTrigger value="query" className="flex items-center gap-2">
               <Search className="w-4 h-4" />
-              质保查询
+              查询质保
             </TabsTrigger>
           </TabsList>
 
@@ -156,46 +174,26 @@ export default function Home() {
           <TabsContent value="upload">
             <Card>
               <CardHeader>
-                <CardTitle>上传质保文件</CardTitle>
+                <CardTitle>上传设备维保表</CardTitle>
                 <CardDescription>
-                  上传设备质保文件并填写相关信息
+                  上传 Excel 文件（.xlsx 或 .xls），系统将自动解析并导入设备数据
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleUpload} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="file">文件 *</Label>
+                    <Label htmlFor="file">选择文件 *</Label>
                     <Input
                       id="file"
                       type="file"
                       ref={fileInputRef}
+                      accept=".xlsx,.xls"
                       onChange={(e) => setFile(e.target.files?.[0] || null)}
                       className="cursor-pointer"
                     />
                     {file && (
                       <p className="text-sm text-gray-500">已选择: {file.name}</p>
                     )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="stationName">场站名称 *</Label>
-                    <Input
-                      id="stationName"
-                      type="text"
-                      placeholder="请输入场站名称"
-                      value={stationName}
-                      onChange={(e) => setStationName(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="warrantyEndDate">质保终止日期 *</Label>
-                    <Input
-                      id="warrantyEndDate"
-                      type="date"
-                      value={warrantyEndDate}
-                      onChange={(e) => setWarrantyEndDate(e.target.value)}
-                    />
                   </div>
 
                   {message && activeTab === 'upload' && (
@@ -213,12 +211,20 @@ export default function Home() {
                     </div>
                   )}
 
+                  {uploadStats && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                      <p className="text-sm text-blue-700 dark:text-blue-400">
+                        解析统计：共 {uploadStats.total} 条记录，成功导入 {uploadStats.inserted} 条
+                      </p>
+                    </div>
+                  )}
+
                   <Button 
                     type="submit" 
                     className="w-full" 
                     disabled={loading}
                   >
-                    {loading ? '上传中...' : '上传文件'}
+                    {loading ? '上传中...' : '上传并解析'}
                   </Button>
                 </form>
               </CardContent>
@@ -231,7 +237,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>查询质保记录</CardTitle>
                 <CardDescription>
-                  输入场站名称进行模糊查询
+                  输入场站名称进行模糊查询（支持部分匹配）
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -239,7 +245,7 @@ export default function Home() {
                   <div className="flex-1">
                     <Input
                       type="text"
-                      placeholder="请输入场站名称（支持模糊搜索）"
+                      placeholder="请输入场站名称（如：湖北省人防办充电站）"
                       value={searchStationName}
                       onChange={(e) => setSearchStationName(e.target.value)}
                     />
@@ -270,63 +276,124 @@ export default function Home() {
                 {records.map((record) => (
                   <Card key={record.id} className="overflow-hidden">
                     <div className={`h-1 ${
-                      record.warranty_status === '在保' ? 'bg-green-500' : 'bg-red-500'
+                      record.warranty_status_display === '在保' ? 'bg-green-500' : 'bg-red-500'
                     }`} />
                     <CardContent className="pt-6">
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {/* 状态标签 */}
                         <div className="flex items-center justify-between">
-                          <Badge 
-                            variant={record.warranty_status === '在保' ? 'default' : 'destructive'}
-                            className="text-sm"
-                          >
-                            {record.warranty_status}
-                          </Badge>
-                          <span className="text-sm text-gray-500">
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant={record.warranty_status_display === '在保' ? 'default' : 'destructive'}
+                              className="text-base px-3 py-1"
+                            >
+                              {record.warranty_status_display}
+                            </Badge>
+                            {record.warranty_status && (
+                              <span className="text-sm text-gray-500">
+                                原始状态：{record.warranty_status}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-sm font-medium ${
+                            record.warranty_status_display === '在保' ? 'text-green-600' : 'text-red-600'
+                          }`}>
                             {record.days_remaining > 0 
                               ? `剩余 ${record.days_remaining} 天` 
                               : `已过期 ${Math.abs(record.days_remaining)} 天`}
                           </span>
                         </div>
 
-                        {/* 信息列表 */}
-                        <div className="space-y-2">
-                          <div className="flex items-start gap-2">
+                        {/* 场站信息 */}
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                          <div className="flex items-start gap-2 mb-2">
                             <Building2 className="w-4 h-4 mt-0.5 text-gray-400" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="flex-1">
+                              <p className="text-base font-semibold text-gray-900 dark:text-white">
                                 {record.station_name}
                               </p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-start gap-2">
-                            <FileText className="w-4 h-4 mt-0.5 text-gray-400" />
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                {record.file_name}
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {[record.province, record.city, record.district].filter(Boolean).join(' · ')}
                               </p>
                             </div>
                           </div>
-                          
+                          {record.station_address && (
+                            <div className="flex items-start gap-2 mt-2">
+                              <MapPin className="w-4 h-4 mt-0.5 text-gray-400" />
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {record.station_address}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 设备信息 */}
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-500">设备名称：</span>
+                            <span className="text-gray-900 dark:text-white font-medium">
+                              {record.device_name || '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">设备类型：</span>
+                            <span className="text-gray-900 dark:text-white">
+                              {record.device_type || '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">产品型号：</span>
+                            <span className="text-gray-900 dark:text-white">
+                              {record.product_model || '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">设备厂商：</span>
+                            <span className="text-gray-900 dark:text-white">
+                              {record.manufacturer || '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">电桩编号：</span>
+                            <span className="text-gray-900 dark:text-white font-mono text-xs">
+                              {record.pile_number || '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">售后编码：</span>
+                            <span className="text-gray-900 dark:text-white font-mono text-xs">
+                              {record.after_sales_code || '-'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 质保信息 */}
+                        <div className="border-t pt-3">
                           <div className="flex items-start gap-2">
                             <Calendar className="w-4 h-4 mt-0.5 text-gray-400" />
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              质保截止: {new Date(record.warranty_end_date).toLocaleDateString('zh-CN')}
-                            </p>
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                质保周期：{record.warranty_period || '-'}
+                              </p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                所属客户：{record.customer || '-'} | 运维商：{record.maintainer || '-'}
+                              </p>
+                            </div>
                           </div>
                         </div>
 
                         {/* 操作按钮 */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => handleDownload(record.file_url, record.file_name)}
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          下载文件
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleDownload(record.file_url, record.file_name)}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            下载源文件
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
