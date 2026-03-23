@@ -82,6 +82,26 @@ export default function Home() {
     createdAt: string;
   }>>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  
+  // 清空所有数据
+  const handleClearAll = async () => {
+    try {
+      const response = await fetch('/api/clear-all', { method: 'DELETE' });
+      const result = await response.json();
+      
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message });
+        setShowClearAllConfirm(false);
+        loadAllRecords(1);
+        loadUploadedFiles();
+      } else {
+        setMessage({ type: 'error', text: result.error || '清空失败' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: '清空失败' });
+    }
+  };
 
   // 加载所有数据
   const loadAllRecords = async (page: number = 1) => {
@@ -408,7 +428,7 @@ export default function Home() {
           {/* 全部数据页面 */}
           <TabsContent value="all">
             {/* 统计卡片 */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-4 mb-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center">
@@ -433,6 +453,44 @@ export default function Home() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+            
+            {/* 数据管理 */}
+            <div className="flex items-center justify-between mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>数据校验：</strong>在保设备 + 过保设备 = {stats.inWarranty + stats.outOfWarranty} 条
+                {stats.total !== stats.inWarranty + stats.outOfWarranty && (
+                  <span className="ml-2 text-orange-600">（与总记录数不符，可能有部分数据质保日期为空）</span>
+                )}
+              </div>
+              
+              {showClearAllConfirm ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleClearAll}
+                  >
+                    确认清空
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowClearAllConfirm(false)}
+                  >
+                    取消
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 border-red-300 hover:bg-red-50"
+                  onClick={() => setShowClearAllConfirm(true)}
+                >
+                  清空所有数据
+                </Button>
+              )}
             </div>
 
             {/* 站点统计 */}
