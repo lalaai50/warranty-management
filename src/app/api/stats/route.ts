@@ -60,8 +60,7 @@ export async function GET(request: NextRequest) {
       stationCount: Object.keys(stationStats).length,
       stations: Object.entries(stationStats)
         .map(([name, stats]) => ({ name, ...stats }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 20),
+        .sort((a, b) => b.total - a.total),
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
