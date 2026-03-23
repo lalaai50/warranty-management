@@ -1,6 +1,5 @@
-// API 基础地址 - 请修改为你的后端服务地址
-// 开发环境可以使用本地地址，生产环境需要使用线上地址
-const API_BASE_URL = 'https://your-domain.com';
+// API 基础地址 - Cloudflare Pages 部署地址
+const API_BASE_URL = 'https://warranty-management.pages.dev';
 
 /**
  * 封装请求方法
