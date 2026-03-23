@@ -34,13 +34,8 @@ export async function GET(request: NextRequest) {
         
         stationStats[stationName].total++;
         
-        if (record.warranty_status === '保内' || record.warranty_status === '在保') {
-          totalInWarranty++;
-          stationStats[stationName].inWarranty++;
-        } else if (record.warranty_status === '保外' || record.warranty_status === '过保') {
-          totalOutOfWarranty++;
-          stationStats[stationName].outOfWarranty++;
-        } else if (record.warranty_end_date) {
+        // 优先按质保结束日期判断，没有日期时才用保修状态字段
+        if (record.warranty_end_date) {
           const endDate = new Date(record.warranty_end_date);
           if (endDate >= now) {
             totalInWarranty++;
@@ -49,6 +44,12 @@ export async function GET(request: NextRequest) {
             totalOutOfWarranty++;
             stationStats[stationName].outOfWarranty++;
           }
+        } else if (record.warranty_status === '保内' || record.warranty_status === '在保') {
+          totalInWarranty++;
+          stationStats[stationName].inWarranty++;
+        } else if (record.warranty_status === '保外' || record.warranty_status === '过保') {
+          totalOutOfWarranty++;
+          stationStats[stationName].outOfWarranty++;
         }
       });
     }
