@@ -61,7 +61,12 @@ function parseExcelContent(text: string): Array<Record<string, string>> {
           record[header.trim()] = values[index].trim();
         }
       });
-      records.push(record);
+      
+      // 验证关键字段：售后编码必须存在且格式正确（以ZH开头）
+      const afterSalesCode = record['售后编码'];
+      if (afterSalesCode && afterSalesCode.startsWith('ZH') && afterSalesCode.length > 5) {
+        records.push(record);
+      }
     }
   }
   
