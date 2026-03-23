@@ -745,7 +745,7 @@ export default function Home() {
                               <div>
                                 <p className="text-lg font-bold text-red-700 dark:text-red-400">整站过保</p>
                                 <p className="text-sm text-red-600 dark:text-red-300">
-                                  该站点所有 {searchResults.length} 台设备均已过保修期，需要续保或维修
+                                  该站点所有 {searchResults.length} 台设备均已过保修期，需要续保后维修
                                 </p>
                               </div>
                             </div>
