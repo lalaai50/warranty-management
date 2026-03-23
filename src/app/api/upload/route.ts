@@ -133,53 +133,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 保存到数据库
-    const client = getSupabaseClient();
-    const insertedRecords = [];
-    const errors = [];
+    // 准备批量插入数据
+    const dbRecords = records.map(record => {
+      const warrantyPeriod = parseWarrantyPeriod(record['质保周期'] || '');
+      return {
+        file_name: file.name,
+        file_url: fileUrl,
+        after_sales_code: record['售后编码'] || null,
+        warranty_status: record['保修状态'] || null,
+        factory_date: record['出厂日期'] || null,
+        factory_number: record['出厂机号'] || null,
+        pile_number: record['电桩编号'] || null,
+        product_code: record['品号'] || null,
+        device_type: record['设备类型'] || null,
+        device_name: record['设备名称'] || null,
+        product_model: record['产品型号'] || null,
+        manufacturer: record['设备厂商'] || null,
+        station_name: record['所属场站'] || null,
+        province: record['所属省份'] || null,
+        city: record['所属城市'] || null,
+        district: record['所属区县'] || null,
+        station_address: record['场站地址'] || null,
+        customer: record['所属客户'] || null,
+        maintainer: record['所属运维商'] || null,
+        warranty_period: record['质保周期'] || null,
+        warranty_start_date: warrantyPeriod.start,
+        warranty_end_date: warrantyPeriod.end,
+      };
+    });
     
-    for (const record of records) {
-      try {
-        const warrantyPeriod = parseWarrantyPeriod(record['质保周期'] || '');
-        
-        const dbRecord = {
-          file_name: file.name,
-          file_url: fileUrl,
-          after_sales_code: record['售后编码'] || null,
-          warranty_status: record['保修状态'] || null,
-          factory_date: record['出厂日期'] || null,
-          factory_number: record['出厂机号'] || null,
-          pile_number: record['电桩编号'] || null,
-          product_code: record['品号'] || null,
-          device_type: record['设备类型'] || null,
-          device_name: record['设备名称'] || null,
-          product_model: record['产品型号'] || null,
-          manufacturer: record['设备厂商'] || null,
-          station_name: record['所属场站'] || null,
-          province: record['所属省份'] || null,
-          city: record['所属城市'] || null,
-          district: record['所属区县'] || null,
-          station_address: record['场站地址'] || null,
-          customer: record['所属客户'] || null,
-          maintainer: record['所属运维商'] || null,
-          warranty_period: record['质保周期'] || null,
-          warranty_start_date: warrantyPeriod.start,
-          warranty_end_date: warrantyPeriod.end,
-        };
-        
-        const { data, error } = await client
-          .from('warranty_records')
-          .insert(dbRecord)
-          .select()
-          .single();
-        
-        if (!error && data) {
-          insertedRecords.push(data);
-        } else if (error) {
-          errors.push({ record: record['售后编码'], error: error.message });
-        }
-      } catch (err) {
-        errors.push({ record: record['售后编码'], error: String(err) });
+    // 批量插入（分批处理，每批500条）
+    const client = getSupabaseClient();
+    const batchSize = 500;
+    let insertedCount = 0;
+    const errors: any[] = [];
+    
+    for (let i = 0; i < dbRecords.length; i += batchSize) {
+      const batch = dbRecords.slice(i, i + batchSize);
+      const { data, error } = await client
+        .from('warranty_records')
+        .insert(batch)
+        .select();
+      
+      if (error) {
+        errors.push({ batch: Math.floor(i / batchSize) + 1, error: error.message });
+      } else {
+        insertedCount += data?.length || 0;
       }
     }
 
@@ -188,10 +187,9 @@ export async function POST(request: NextRequest) {
       data: {
         totalRows: jsonData.length - headerIndex - 1,
         validRecords: records.length,
-        insertedRecords: insertedRecords.length,
+        insertedRecords: insertedCount,
         errors: errors.length,
-        errorDetails: errors.slice(0, 5), // 只返回前5个错误
-        records: insertedRecords.slice(0, 5), // 只返回前5条记录作为示例
+        errorDetails: errors,
       },
     });
   } catch (error) {
