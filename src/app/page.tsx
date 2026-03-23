@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Search, FileText, MapPin, AlertCircle, CheckCircle, Download, Calendar, Building2, Zap, Factory, Database, ChevronLeft, ChevronRight, Trash2, FileX } from 'lucide-react';
+import { Upload, Search, FileText, MapPin, AlertCircle, CheckCircle, Download, Calendar, Building2, Zap, Factory, Database, Trash2 } from 'lucide-react';
 
 interface WarrantyRecord {
   id: number;
@@ -38,13 +38,6 @@ interface WarrantyRecord {
   days_remaining: number;
 }
 
-interface Pagination {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
-
 interface Stats {
   total: number;
   inWarranty: number;
@@ -63,14 +56,12 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [searchStationName, setSearchStationName] = useState('');
   const [searchResults, setSearchResults] = useState<WarrantyRecord[]>([]);
-  const [allRecords, setAllRecords] = useState<WarrantyRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [uploadStats, setUploadStats] = useState<{ total: number; inserted: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // 分页和统计
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+  // 统计
   const [stats, setStats] = useState<Stats>({ total: 0, inWarranty: 0, outOfWarranty: 0 });
   const [stationStats, setStationStats] = useState<StationStat[]>([]);
   
@@ -93,7 +84,7 @@ export default function Home() {
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
         setShowClearAllConfirm(false);
-        loadAllRecords(1);
+        loadStats();
         loadUploadedFiles();
       } else {
         setMessage({ type: 'error', text: result.error || '清空失败' });
@@ -103,20 +94,22 @@ export default function Home() {
     }
   };
 
-  // 加载所有数据
-  const loadAllRecords = async (page: number = 1) => {
+  // 加载统计数据
+  const loadStats = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/records?page=${page}&pageSize=${pagination.pageSize}`);
+      const response = await fetch('/api/stats');
       const result = await response.json();
 
-      if (result.success) {
-        setAllRecords(result.data);
-        setPagination(result.pagination);
-        setStats(result.stats);
-        setStationStats(result.stationStats || []);
+      if (result.total !== undefined) {
+        setStats({ 
+          total: result.total, 
+          inWarranty: result.inWarranty, 
+          outOfWarranty: result.outOfWarranty 
+        });
+        setStationStats(result.stations || []);
       } else {
-        setMessage({ type: 'error', text: result.error || '加载失败' });
+        setMessage({ type: 'error', text: '加载失败' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: '加载数据失败' });
@@ -150,7 +143,7 @@ export default function Home() {
         setMessage({ type: 'success', text: result.message });
         setShowDeleteConfirm(null);
         loadUploadedFiles();
-        loadAllRecords(1);
+        loadStats();
       } else {
         setMessage({ type: 'error', text: result.error || '删除失败' });
       }
@@ -159,15 +152,15 @@ export default function Home() {
     }
   };
 
-  // 页面加载时获取所有数据
+  // 页面加载时获取统计数据
   useEffect(() => {
     if (activeTab === 'all') {
-      loadAllRecords(pagination.page);
+      loadStats();
     }
     if (activeTab === 'upload') {
       loadUploadedFiles();
     }
-  }, [activeTab, pagination.page]);
+  }, [activeTab]);
 
   // 文件上传
   const handleUpload = async (e: React.FormEvent) => {
@@ -204,7 +197,7 @@ export default function Home() {
           fileInputRef.current.value = '';
         }
         // 刷新数据
-        loadAllRecords(1);
+        loadStats();
         loadUploadedFiles();
       } else {
         setMessage({ type: 'error', text: result.error || '上传失败' });
@@ -498,7 +491,7 @@ export default function Home() {
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle>站点统计</CardTitle>
-                  <CardDescription>各站点的设备数量及质保状态分布</CardDescription>
+                  <CardDescription>各站点的设备数量及质保状态分布（共 {stationStats.length} 个站点）</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
@@ -549,48 +542,14 @@ export default function Home() {
               </Card>
             )}
 
-            {/* 数据列表 */}
-            <div className="space-y-4">
-              {allRecords.length > 0 ? (
-                <>
-                  {allRecords.map(renderRecordCard)}
-                  
-                  {/* 分页 */}
-                  {pagination.totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 mt-6">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={pagination.page === 1}
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        上一页
-                      </Button>
-                      <span className="text-sm text-gray-600">
-                        第 {pagination.page} / {pagination.totalPages} 页
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={pagination.page === pagination.totalPages}
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                      >
-                        下一页
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <Database className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                    <p className="text-gray-500">暂无数据，请先上传 Excel 文件</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            {stats.total === 0 && (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <Database className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">暂无数据，请先上传 Excel 文件</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* 上传页面 */}
