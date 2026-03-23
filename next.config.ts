@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Cloudflare Pages 配置
+  experimental: {
+    // 启用服务端 Actions 支持
+    serverActions: {
+      allowedOrigins: ['*.pages.dev', 'localhost:3000'],
+    },
+  },
 };
 
 export default nextConfig;
