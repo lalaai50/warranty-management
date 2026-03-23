@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Storage } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as XLSX from 'xlsx';
 
-// 初始化对象存储
-const storage = new S3Storage({
-  endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-  accessKey: process.env.COZE_BUCKET_ACCESS_KEY || '',
-  secretKey: process.env.COZE_BUCKET_SECRET_KEY || '',
-  bucketName: process.env.COZE_BUCKET_NAME,
-  region: process.env.COZE_BUCKET_REGION || 'cn-beijing',
-});
+export const runtime = 'edge';
 
 // 解析质保周期（格式：2023-07-31~2026-07-30）
 function parseWarrantyPeriod(period: string): { start: string | null; end: string | null } {
@@ -51,24 +43,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 读取文件内容
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    // 读取文件内容 - 使用 Uint8Array 替代 Buffer（Edge Runtime 兼容）
+    const fileArrayBuffer = await file.arrayBuffer();
+    const fileUint8Array = new Uint8Array(fileArrayBuffer);
     
-    // 上传文件到对象存储
-    const fileKey = await storage.uploadFile({
-      fileContent: fileBuffer,
-      fileName: `warranty-files/${Date.now()}_${file.name}`,
-      contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
+    // 上传文件到 Supabase Storage
+    const client = getSupabaseClient();
+    const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
+    const fileKey = `warranty-files/${Date.now()}_${file.name}`;
+    
+    const { data: uploadData, error: uploadError } = await client
+      .storage
+      .from(bucketName)
+      .upload(fileKey, fileUint8Array, {
+        contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        upsert: false,
+      });
+    
+    if (uploadError) {
+      console.error('文件上传失败:', uploadError);
+      return NextResponse.json(
+        { error: '文件上传失败: ' + uploadError.message },
+        { status: 500 }
+      );
+    }
+    
+    // 获取文件的公开访问 URL
+    const { data: urlData } = client
+      .storage
+      .from(bucketName)
+      .getPublicUrl(fileKey);
+    
+    const fileUrl = urlData.publicUrl;
 
-    // 生成文件访问 URL（有效期 7 天）
-    const fileUrl = await storage.generatePresignedUrl({
-      key: fileKey,
-      expireTime: 604800, // 7 天
-    });
-
-    // 使用 xlsx 库解析 Excel 文件
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    // 使用 xlsx 库解析 Excel 文件 - 使用 array 类型（Edge Runtime 兼容）
+    const workbook = XLSX.read(fileUint8Array, { type: 'array' });
     const sheetName = workbook.SheetNames[0]; // 获取第一个工作表
     const worksheet = workbook.Sheets[sheetName];
     
@@ -163,7 +172,6 @@ export async function POST(request: NextRequest) {
     });
     
     // 批量插入（分批处理，每批500条）
-    const client = getSupabaseClient();
     const batchSize = 500;
     let insertedCount = 0;
     const errors: any[] = [];

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { S3Storage } from 'coze-coding-dev-sdk';
 import * as XLSX from 'xlsx';
+
+export const runtime = 'edge';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,10 +23,10 @@ export async function GET(request: NextRequest) {
     // 下载文件
     const response = await fetch(latestFile.file_url);
     const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const uint8Array = new Uint8Array(arrayBuffer);
     
-    // 解析Excel
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    // 解析Excel - 使用 array 类型（Edge Runtime 兼容）
+    const workbook = XLSX.read(uint8Array, { type: 'array' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     

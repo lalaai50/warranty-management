@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
+export const runtime = 'edge';
+
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
