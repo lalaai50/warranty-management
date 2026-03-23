@@ -119,9 +119,9 @@ export default function Home() {
   };
   
   // 删除文件
-  const handleDeleteFile = async (fileName: string) => {
+  const handleDeleteFile = async (fileUrl: string) => {
     try {
-      const response = await fetch(`/api/delete?fileName=${encodeURIComponent(fileName)}`, {
+      const response = await fetch(`/api/delete?fileUrl=${encodeURIComponent(fileUrl)}`, {
         method: 'DELETE',
       });
       const result = await response.json();
@@ -599,9 +599,9 @@ export default function Home() {
             {uploadedFiles.length > 0 && (
               <Card className="mt-6">
                 <CardHeader>
-                  <CardTitle>已上传文件</CardTitle>
+                  <CardTitle>已上传文件 ({uploadedFiles.length} 次)</CardTitle>
                   <CardDescription>
-                    点击删除按钮可删除该文件及其所有数据
+                    点击删除按钮可删除该次上传及其所有数据
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -623,12 +623,12 @@ export default function Home() {
                           </p>
                         </div>
                         
-                        {showDeleteConfirm === file.fileName ? (
+                        {showDeleteConfirm === file.fileUrl ? (
                           <div className="flex items-center gap-2 ml-4">
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteFile(file.fileName)}
+                              onClick={() => handleDeleteFile(file.fileUrl)}
                             >
                               确认删除
                             </Button>
@@ -645,7 +645,7 @@ export default function Home() {
                             variant="ghost"
                             size="sm"
                             className="ml-4 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => setShowDeleteConfirm(file.fileName)}
+                            onClick={() => setShowDeleteConfirm(file.fileUrl)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

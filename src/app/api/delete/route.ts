@@ -5,7 +5,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const fileName = searchParams.get('fileName');
+    const fileUrl = searchParams.get('fileUrl');
 
     const client = getSupabaseClient();
 
@@ -21,12 +21,12 @@ export async function DELETE(request: NextRequest) {
       }
 
       return NextResponse.json({ success: true, message: '记录已删除' });
-    } else if (fileName) {
-      // 删除该文件的所有记录
+    } else if (fileUrl) {
+      // 删除该文件URL的所有记录
       const { data, error } = await client
         .from('warranty_records')
         .delete()
-        .eq('file_name', fileName)
+        .eq('file_url', decodeURIComponent(fileUrl))
         .select('id');
 
       if (error) {
@@ -46,12 +46,12 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// 获取已上传的文件列表
+// 获取已上传的文件列表（按实际文件URL分组）
 export async function GET(request: NextRequest) {
   try {
     const client = getSupabaseClient();
 
-    // 按文件名分组统计
+    // 获取所有记录
     const { data, error } = await client
       .from('warranty_records')
       .select('file_name, file_url, created_at');
@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 统计每个文件的记录数
-    const fileStats: Record<string, { 
+    // 按文件URL分组统计（真正的不同上传）
+    const fileByUrl: Record<string, { 
       fileName: string; 
       fileUrl: string; 
       count: number; 
@@ -69,20 +69,19 @@ export async function GET(request: NextRequest) {
     }> = {};
 
     data?.forEach((record) => {
-      if (!fileStats[record.file_name]) {
-        fileStats[record.file_name] = {
+      if (!fileByUrl[record.file_url]) {
+        fileByUrl[record.file_url] = {
           fileName: record.file_name,
           fileUrl: record.file_url,
           count: 0,
           createdAt: record.created_at,
         };
       }
-      fileStats[record.file_name].count++;
+      fileByUrl[record.file_url].count++;
     });
 
-    const files = Object.values(fileStats).sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const files = Object.values(fileByUrl)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return NextResponse.json({ success: true, files });
   } catch (error) {
