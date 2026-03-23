@@ -1,0 +1,67 @@
+<!--pages/index/index.wxml-->
+<view class="container">
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading-container">
+    <view class="loading-text">加载中...</view>
+  </view>
+
+  <view wx:else>
+    <!-- 统计卡片 -->
+    <view class="stats-container">
+      <view class="stat-card">
+        <view class="stat-number">{{stats.total}}</view>
+        <view class="stat-label">总设备数</view>
+      </view>
+      <view class="stat-card stat-green">
+        <view class="stat-number">{{stats.inWarranty}}</view>
+        <view class="stat-label">在保设备</view>
+      </view>
+      <view class="stat-card stat-red">
+        <view class="stat-number">{{stats.outOfWarranty}}</view>
+        <view class="stat-label">过保设备</view>
+      </view>
+    </view>
+
+    <!-- 数据校验 -->
+    <view class="validation-card">
+      <view class="validation-content">
+        <text class="validation-text">数据校验：在保 + 过保 = {{stats.inWarranty + stats.outOfWarranty}} 条</text>
+        <text wx:if="{{stats.total !== stats.inWarranty + stats.outOfWarranty}}" class="validation-warning">
+          （与总记录数不符）
+        </text>
+      </view>
+      <view wx:if="{{showClearConfirm}}" class="confirm-buttons">
+        <view class="btn-confirm" bindtap="clearAllData">确认清空</view>
+        <view class="btn-cancel" bindtap="hideClearConfirm">取消</view>
+      </view>
+      <view wx:else class="btn-clear" bindtap="showClearConfirm">清空数据</view>
+    </view>
+
+    <!-- 站点统计 -->
+    <view class="section-card" wx:if="{{stationStats.length > 0}}">
+      <view class="section-header">
+        <text class="section-title">站点统计</text>
+        <text class="section-desc">共 {{stationCount}} 个站点</text>
+      </view>
+      
+      <scroll-view scroll-y class="station-list">
+        <view class="station-item" wx:for="{{stationStats}}" wx:key="name">
+          <view class="station-name">{{item.name}}</view>
+          <view class="station-stats">
+            <text class="total">{{item.total}}台</text>
+            <text class="in-warranty">{{item.inWarranty}}在保</text>
+            <text class="out-warranty">{{item.outOfWarranty}}过保</text>
+            <text class="rate">{{(item.inWarranty / item.total * 100).toFixed(1)}}%</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 无数据提示 -->
+    <view class="empty-container" wx:if="{{stats.total === 0}}">
+      <view class="empty-icon">📊</view>
+      <view class="empty-text">暂无数据</view>
+      <view class="empty-hint">请先上传Excel文件</view>
+    </view>
+  </view>
+</view>

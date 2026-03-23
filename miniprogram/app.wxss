@@ -1,0 +1,101 @@
+/* app.wxss - 全局样式 */
+page {
+  background-color: #f9fafb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 28rpx;
+  color: #1f2937;
+}
+
+/* 全局工具类 */
+.text-center {
+  text-align: center;
+}
+
+.text-gray {
+  color: #6b7280;
+}
+
+.text-green {
+  color: #16a34a;
+}
+
+.text-red {
+  color: #dc2626;
+}
+
+.text-orange {
+  color: #ea580c;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-2 {
+  gap: 16rpx;
+}
+
+.mt-2 {
+  margin-top: 16rpx;
+}
+
+.mb-2 {
+  margin-bottom: 16rpx;
+}
+
+.p-2 {
+  padding: 16rpx;
+}
+
+/* 卡片基础样式 */
+.card {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+/* 按钮基础样式 */
+.btn {
+  padding: 16rpx 32rpx;
+  border-radius: 12rpx;
+  text-align: center;
+  font-size: 28rpx;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1rpx solid #d1d5db;
+  color: #374151;
+}

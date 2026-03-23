@@ -1,0 +1,52 @@
+<!--pages/upload/upload.wxml-->
+<view class="container">
+  <!-- 上传区域 -->
+  <view class="upload-card">
+    <view class="upload-header">
+      <text class="upload-title">上传设备维保表</text>
+      <text class="upload-desc">支持 .xlsx 和 .xls 格式的Excel文件</text>
+    </view>
+    
+    <view class="upload-area" bindtap="chooseFile">
+      <view class="upload-icon">📁</view>
+      <text class="upload-text">{{uploading ? '上传中...' : '点击选择Excel文件'}}</text>
+    </view>
+
+    <!-- 上传结果 -->
+    <view wx:if="{{uploadResult}}" class="upload-result {{uploadResult.success ? 'success' : 'error'}}">
+      <text class="result-text">{{uploadResult.message}}</text>
+    </view>
+  </view>
+
+  <!-- 已上传文件列表 -->
+  <view class="files-card" wx:if="{{uploadedFiles.length > 0}}">
+    <view class="files-header">
+      <text class="files-title">已上传文件 ({{uploadedFiles.length}} 次)</text>
+      <text class="files-desc">点击删除按钮可删除该批次数据</text>
+    </view>
+
+    <view class="file-list">
+      <view class="file-item" wx:for="{{uploadedFiles}}" wx:key="fileUrl">
+        <view class="file-info">
+          <text class="file-name">📄 {{item.fileName}}</text>
+          <text class="file-meta">{{item.count}} 条记录 · {{item.createdAt}}</text>
+        </view>
+        
+        <view wx:if="{{deleteConfirmUrl === item.fileUrl}}" class="delete-confirm">
+          <view class="btn-delete-confirm" bindtap="deleteFile">确认</view>
+          <view class="btn-cancel" bindtap="hideDeleteConfirm">取消</view>
+        </view>
+        <view wx:else class="btn-delete" bindtap="showDeleteConfirm" data-url="{{item.fileUrl}}">
+          🗑️
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 无文件提示 -->
+  <view class="empty-container" wx:if="{{uploadedFiles.length === 0 && !uploading}}">
+    <view class="empty-icon">📂</view>
+    <view class="empty-text">暂无上传记录</view>
+    <view class="empty-hint">上传Excel文件开始管理设备质保信息</view>
+  </view>
+</view>

@@ -1,0 +1,140 @@
+<!--pages/query/query.wxml-->
+<view class="container">
+  <!-- 搜索区域 -->
+  <view class="search-card">
+    <view class="search-header">
+      <text class="search-title">查询质保记录</text>
+      <text class="search-desc">输入场站名称进行模糊查询</text>
+    </view>
+    
+    <view class="search-area">
+      <input 
+        class="search-input" 
+        placeholder="请输入场站名称" 
+        value="{{searchValue}}"
+        bindinput="onInputChange"
+        confirm-type="search"
+        bindconfirm="doSearch"
+      />
+      <button class="search-btn" bindtap="doSearch" loading="{{searching}}">
+        查询
+      </button>
+    </view>
+  </view>
+
+  <!-- 错误提示 -->
+  <view class="error-card" wx:if="{{errorMessage}}">
+    <text class="error-text">{{errorMessage}}</text>
+  </view>
+
+  <!-- 站点状态汇总 -->
+  <view wx:if="{{stationSummary}}">
+    <!-- 整站在保 -->
+    <view wx:if="{{stationSummary.status === 'all-in-warranty'}}" class="summary-card summary-green">
+      <view class="summary-icon">✅</view>
+      <view class="summary-content">
+        <text class="summary-title">整站在保</text>
+        <text class="summary-desc">该站点所有 {{stationSummary.total}} 台设备均在保修期内</text>
+      </view>
+    </view>
+
+    <!-- 整站过保 -->
+    <view wx:if="{{stationSummary.status === 'all-out-of-warranty'}}" class="summary-card summary-red">
+      <view class="summary-icon">⚠️</view>
+      <view class="summary-content">
+        <text class="summary-title">整站过保</text>
+        <text class="summary-desc">该站点所有 {{stationSummary.total}} 台设备均已过保修期，需要续保后维修</text>
+      </view>
+    </view>
+
+    <!-- 部分过保 -->
+    <view wx:if="{{stationSummary.status === 'partial'}}" class="summary-card summary-orange">
+      <view class="summary-icon">🔶</view>
+      <view class="summary-content">
+        <text class="summary-title">部分过保</text>
+        <text class="summary-desc">该站点共 {{stationSummary.total}} 台设备，其中 {{stationSummary.inWarranty}} 台在保，{{stationSummary.outOfWarranty}} 台过保</text>
+      </view>
+      
+      <!-- 设备分类列表 -->
+      <view class="device-groups">
+        <!-- 在保设备 -->
+        <view class="device-group group-green">
+          <text class="group-title">✓ 在保设备 ({{stationSummary.inWarranty}} 台)</text>
+          <view class="device-tags">
+            <text class="device-tag tag-green" wx:for="{{stationSummary.inWarrantyRecords}}" wx:key="id">
+              {{item.device_name || item.pile_number || item.after_sales_code}}
+            </text>
+          </view>
+        </view>
+        
+        <!-- 过保设备 -->
+        <view class="device-group group-red">
+          <text class="group-title">✗ 过保设备 ({{stationSummary.outOfWarranty}} 台)</text>
+          <view class="device-tags">
+            <text class="device-tag tag-red" wx:for="{{stationSummary.outOfWarrantyRecords}}" wx:key="id">
+              {{item.device_name || item.pile_number || item.after_sales_code}}
+            </text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 查询结果列表 -->
+  <view class="results-card" wx:if="{{searchResults.length > 0}}">
+    <view class="results-header">
+      <text class="results-title">设备明细 ({{searchResults.length}} 条)</text>
+    </view>
+
+    <view class="result-list">
+      <view class="result-item" wx:for="{{searchResults}}" wx:key="id">
+        <!-- 状态条 -->
+        <view class="status-bar {{item.warranty_status_display === '在保' ? 'bar-green' : 'bar-red'}}"></view>
+        
+        <view class="result-content">
+          <!-- 状态和剩余天数 -->
+          <view class="status-row">
+            <view class="status-badge {{item.warranty_status_display === '在保' ? 'badge-green' : 'badge-red'}}">
+              {{item.warranty_status_display}}
+            </view>
+            <text class="days-text {{item.warranty_status_display === '在保' ? 'days-green' : 'days-red'}}">
+              {{item.days_remaining > 0 ? '剩余' + item.days_remaining + '天' : '已过期' + Math.abs(item.days_remaining) + '天'}}
+            </text>
+          </view>
+
+          <!-- 场站信息 -->
+          <view class="station-info">
+            <text class="station-name">{{item.station_name}}</text>
+            <text class="station-location">{{item.province}} · {{item.city}} · {{item.district}}</text>
+          </view>
+
+          <!-- 设备信息 -->
+          <view class="device-info">
+            <view class="info-row">
+              <text class="info-label">设备名称：</text>
+              <text class="info-value">{{item.device_name || '-'}}</text>
+            </view>
+            <view class="info-row">
+              <text class="info-label">产品型号：</text>
+              <text class="info-value">{{item.product_model || '-'}}</text>
+            </view>
+            <view class="info-row">
+              <text class="info-label">电桩编号：</text>
+              <text class="info-value mono">{{item.pile_number || '-'}}</text>
+            </view>
+            <view class="info-row">
+              <text class="info-label">售后编码：</text>
+              <text class="info-value mono">{{item.after_sales_code || '-'}}</text>
+            </view>
+          </view>
+
+          <!-- 质保信息 -->
+          <view class="warranty-info">
+            <text class="warranty-label">质保周期：</text>
+            <text class="warranty-value">{{item.warranty_period || '-'}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
