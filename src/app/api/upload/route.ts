@@ -50,7 +50,11 @@ export async function POST(request: NextRequest) {
     // 上传文件到 Supabase Storage
     const client = getSupabaseClient();
     const bucketName = process.env.SUPABASE_BUCKET || 'uploads';
-    const fileKey = `warranty-files/${Date.now()}_${file.name}`;
+    
+    // 处理文件名：移除中文字符，使用时间戳+随机字符串+扩展名
+    const fileExt = file.name.split('.').pop() || 'xlsx';
+    const sanitizedFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+    const fileKey = `warranty-files/${sanitizedFileName}`;
     
     const { data: uploadData, error: uploadError } = await client
       .storage
