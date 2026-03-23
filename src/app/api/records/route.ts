@@ -9,8 +9,57 @@ export async function GET(request: NextRequest) {
     
     const client = getSupabaseClient();
     
-    // 计算偏移量
-    const offset = (page - 1) * pageSize;
+    // 查询所有记录用于统计
+    const { data: allData, error: allError } = await client
+      .from('warranty_records')
+      .select('station_name, warranty_end_date');
+
+    if (allError) {
+      console.error('查询失败:', allError);
+      return NextResponse.json(
+        { error: '查询失败' },
+        { status: 500 }
+      );
+    }
+
+    // 计算总体统计
+    const now = new Date();
+    let totalInWarranty = 0;
+    let totalOutOfWarranty = 0;
+    
+    // 按站点统计
+    const stationStats: Record<string, { total: number; inWarranty: number; outOfWarranty: number }> = {};
+    
+    allData?.forEach((record) => {
+      const stationName = record.station_name || '未知站点';
+      
+      // 初始化站点统计
+      if (!stationStats[stationName]) {
+        stationStats[stationName] = { total: 0, inWarranty: 0, outOfWarranty: 0 };
+      }
+      
+      stationStats[stationName].total++;
+      
+      // 判断质保状态
+      if (record.warranty_end_date) {
+        const endDate = new Date(record.warranty_end_date);
+        if (endDate >= now) {
+          totalInWarranty++;
+          stationStats[stationName].inWarranty++;
+        } else {
+          totalOutOfWarranty++;
+          stationStats[stationName].outOfWarranty++;
+        }
+      }
+    });
+    
+    // 转换为数组并排序
+    const stationStatsArray = Object.entries(stationStats)
+      .map(([name, stats]) => ({
+        name,
+        ...stats,
+      }))
+      .sort((a, b) => b.total - a.total); // 按总数降序排列
     
     // 查询总记录数
     const { count, error: countError } = await client
@@ -24,6 +73,9 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
+    
+    // 计算偏移量
+    const offset = (page - 1) * pageSize;
     
     // 查询分页数据
     const { data, error } = await client
@@ -41,7 +93,6 @@ export async function GET(request: NextRequest) {
     }
 
     // 判断质保状态
-    const now = new Date();
     const recordsWithStatus = data?.map((record) => {
       let isWarrantyValid = false;
       let daysRemaining = 0;
@@ -59,13 +110,6 @@ export async function GET(request: NextRequest) {
       };
     }) || [];
 
-    // 计算统计信息
-    const stats = {
-      total: count || 0,
-      inWarranty: recordsWithStatus.filter(r => r.warranty_status_display === '在保').length,
-      outOfWarranty: recordsWithStatus.filter(r => r.warranty_status_display === '过保').length,
-    };
-
     return NextResponse.json({
       success: true,
       data: recordsWithStatus,
@@ -75,7 +119,12 @@ export async function GET(request: NextRequest) {
         total: count || 0,
         totalPages: Math.ceil((count || 0) / pageSize),
       },
-      stats,
+      stats: {
+        total: count || 0,
+        inWarranty: totalInWarranty,
+        outOfWarranty: totalOutOfWarranty,
+      },
+      stationStats: stationStatsArray,
     });
   } catch (error) {
     console.error('查询失败:', error);

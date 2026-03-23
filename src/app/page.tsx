@@ -51,6 +51,13 @@ interface Stats {
   outOfWarranty: number;
 }
 
+interface StationStat {
+  name: string;
+  total: number;
+  inWarranty: number;
+  outOfWarranty: number;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState('all');
   const [file, setFile] = useState<File | null>(null);
@@ -65,6 +72,7 @@ export default function Home() {
   // 分页和统计
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
   const [stats, setStats] = useState<Stats>({ total: 0, inWarranty: 0, outOfWarranty: 0 });
+  const [stationStats, setStationStats] = useState<StationStat[]>([]);
 
   // 加载所有数据
   const loadAllRecords = async (page: number = 1) => {
@@ -77,6 +85,7 @@ export default function Home() {
         setAllRecords(result.data);
         setPagination(result.pagination);
         setStats(result.stats);
+        setStationStats(result.stationStats || []);
       } else {
         setMessage({ type: 'error', text: result.error || '加载失败' });
       }
@@ -378,6 +387,62 @@ export default function Home() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* 站点统计 */}
+            {stationStats.length > 0 && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>站点统计</CardTitle>
+                  <CardDescription>各站点的设备数量及质保状态分布</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-2 font-medium text-gray-900 dark:text-white">站点名称</th>
+                          <th className="text-center py-3 px-2 font-medium text-gray-900 dark:text-white">总设备数</th>
+                          <th className="text-center py-3 px-2 font-medium text-green-600">在保</th>
+                          <th className="text-center py-3 px-2 font-medium text-red-600">过保</th>
+                          <th className="text-center py-3 px-2 font-medium text-gray-500">在保率</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stationStats.map((station, index) => {
+                          const warrantyRate = station.total > 0 
+                            ? ((station.inWarranty / station.total) * 100).toFixed(1)
+                            : '0.0';
+                          
+                          return (
+                            <tr key={index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                              <td className="py-3 px-2 text-gray-900 dark:text-white">
+                                {station.name}
+                              </td>
+                              <td className="py-3 px-2 text-center font-medium text-gray-900 dark:text-white">
+                                {station.total}
+                              </td>
+                              <td className="py-3 px-2 text-center">
+                                <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                  {station.inWarranty}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center">
+                                <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                  {station.outOfWarranty}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center text-gray-600 dark:text-gray-400">
+                                {warrantyRate}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* 数据列表 */}
             <div className="space-y-4">
