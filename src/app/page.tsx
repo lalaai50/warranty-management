@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Search, FileText, MapPin, AlertCircle, CheckCircle, Download, Calendar, Building2, Zap, Factory, Database, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Upload, Search, FileText, MapPin, AlertCircle, CheckCircle, Download, Calendar, Building2, Zap, Factory, Database, ChevronLeft, ChevronRight, Trash2, FileX } from 'lucide-react';
 
 interface WarrantyRecord {
   id: number;
@@ -73,6 +73,15 @@ export default function Home() {
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
   const [stats, setStats] = useState<Stats>({ total: 0, inWarranty: 0, outOfWarranty: 0 });
   const [stationStats, setStationStats] = useState<StationStat[]>([]);
+  
+  // 已上传文件列表
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    fileName: string;
+    fileUrl: string;
+    count: number;
+    createdAt: string;
+  }>>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   // 加载所有数据
   const loadAllRecords = async (page: number = 1) => {
@@ -95,11 +104,48 @@ export default function Home() {
       setLoading(false);
     }
   };
+  
+  // 加载已上传文件列表
+  const loadUploadedFiles = async () => {
+    try {
+      const response = await fetch('/api/delete');
+      const result = await response.json();
+      if (result.success) {
+        setUploadedFiles(result.files);
+      }
+    } catch (error) {
+      console.error('加载文件列表失败:', error);
+    }
+  };
+  
+  // 删除文件
+  const handleDeleteFile = async (fileName: string) => {
+    try {
+      const response = await fetch(`/api/delete?fileName=${encodeURIComponent(fileName)}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message });
+        setShowDeleteConfirm(null);
+        loadUploadedFiles();
+        loadAllRecords(1);
+      } else {
+        setMessage({ type: 'error', text: result.error || '删除失败' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: '删除失败' });
+    }
+  };
 
   // 页面加载时获取所有数据
   useEffect(() => {
     if (activeTab === 'all') {
       loadAllRecords(pagination.page);
+    }
+    if (activeTab === 'upload') {
+      loadUploadedFiles();
     }
   }, [activeTab, pagination.page]);
 
@@ -139,6 +185,7 @@ export default function Home() {
         }
         // 刷新数据
         loadAllRecords(1);
+        loadUploadedFiles();
       } else {
         setMessage({ type: 'error', text: result.error || '上传失败' });
       }
@@ -547,6 +594,68 @@ export default function Home() {
                 </form>
               </CardContent>
             </Card>
+            
+            {/* 已上传文件列表 */}
+            {uploadedFiles.length > 0 && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>已上传文件</CardTitle>
+                  <CardDescription>
+                    点击删除按钮可删除该文件及其所有数据
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {uploadedFiles.map((file, index) => (
+                      <div 
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                              {file.fileName}
+                            </p>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1 ml-6">
+                            {file.count} 条记录 · {new Date(file.createdAt).toLocaleString('zh-CN')}
+                          </p>
+                        </div>
+                        
+                        {showDeleteConfirm === file.fileName ? (
+                          <div className="flex items-center gap-2 ml-4">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteFile(file.fileName)}
+                            >
+                              确认删除
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowDeleteConfirm(null)}
+                            >
+                              取消
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-4 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setShowDeleteConfirm(file.fileName)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* 查询页面 */}
