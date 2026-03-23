@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Storage, FetchClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
+import { S3Storage } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import * as XLSX from 'xlsx';
 
 // 初始化对象存储
 const storage = new S3Storage({
@@ -13,7 +14,7 @@ const storage = new S3Storage({
 
 // 解析质保周期（格式：2023-07-31~2026-07-30）
 function parseWarrantyPeriod(period: string): { start: string | null; end: string | null } {
-  if (!period || period === '质保周期') {
+  if (!period || typeof period !== 'string') {
     return { start: null, end: null };
   }
   
@@ -22,55 +23,6 @@ function parseWarrantyPeriod(period: string): { start: string | null; end: strin
     return { start: parts[0].trim(), end: parts[1].trim() };
   }
   return { start: null, end: null };
-}
-
-// 解析 Excel 文本内容为数据行
-function parseExcelContent(text: string): Array<Record<string, string>> {
-  const lines = text.split('\n');
-  const records: Array<Record<string, string>> = [];
-  
-  // 找到表头行（包含"售后编码"的行）
-  let headerIndex = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes('售后编码')) {
-      headerIndex = i;
-      break;
-    }
-  }
-  
-  if (headerIndex === -1) {
-    return [];
-  }
-  
-  // 提取表头
-  const headerLine = lines[headerIndex];
-  const headers = headerLine.split('|').filter(h => h.trim());
-  
-  // 解析数据行
-  for (let i = headerIndex + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line || line.startsWith('|---') || !line.includes('|')) {
-      continue;
-    }
-    
-    const values = line.split('|').filter(v => v.trim());
-    if (values.length >= 18) {
-      const record: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        if (index < values.length) {
-          record[header.trim()] = values[index].trim();
-        }
-      });
-      
-      // 验证关键字段：售后编码必须存在且格式正确（以ZH开头）
-      const afterSalesCode = record['售后编码'];
-      if (afterSalesCode && afterSalesCode.startsWith('ZH') && afterSalesCode.length > 5) {
-        records.push(record);
-      }
-    }
-  }
-  
-  return records;
 }
 
 export async function POST(request: NextRequest) {
@@ -115,28 +67,64 @@ export async function POST(request: NextRequest) {
       expireTime: 604800, // 7 天
     });
 
-    // 使用 FetchClient 解析 Excel 文件
-    const config = new Config();
-    const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-    const fetchClient = new FetchClient(config, customHeaders);
+    // 使用 xlsx 库解析 Excel 文件
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0]; // 获取第一个工作表
+    const worksheet = workbook.Sheets[sheetName];
     
-    const response = await fetchClient.fetch(fileUrl);
+    // 将工作表转换为 JSON
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
     
-    if (response.status_code !== 0) {
+    if (jsonData.length < 2) {
       return NextResponse.json(
-        { error: '解析 Excel 文件失败' },
-        { status: 500 }
+        { error: 'Excel 文件没有数据或格式不正确' },
+        { status: 400 }
       );
     }
-
-    // 提取文本内容
-    const textContent = response.content
-      .filter(item => item.type === 'text')
-      .map(item => item.text)
-      .join('\n');
-
+    
+    // 找到表头行（包含"售后编码"的行）
+    let headerIndex = -1;
+    for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+      const row = jsonData[i];
+      if (row && row.includes('售后编码')) {
+        headerIndex = i;
+        break;
+      }
+    }
+    
+    if (headerIndex === -1) {
+      return NextResponse.json(
+        { error: '未找到表头行，请检查 Excel 文件格式' },
+        { status: 400 }
+      );
+    }
+    
+    // 提取表头
+    const headers = jsonData[headerIndex] as string[];
+    
     // 解析数据行
-    const records = parseExcelContent(textContent);
+    const records: Array<Record<string, string>> = [];
+    for (let i = headerIndex + 1; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      if (!row || row.length === 0) continue;
+      
+      const record: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        if (header && row[index] !== undefined) {
+          record[header.toString()] = row[index]?.toString() || '';
+        }
+      });
+      
+      // 验证关键字段：售后编码和场站名都必须存在
+      const afterSalesCode = record['售后编码'];
+      const stationName = record['所属场站'];
+      
+      // 只要售后编码和场站名都存在且非空，就认为是有效数据
+      if (afterSalesCode && afterSalesCode.trim().length > 0 && 
+          stationName && stationName.trim().length > 0) {
+        records.push(record);
+      }
+    }
     
     if (records.length === 0) {
       return NextResponse.json(
@@ -148,52 +136,62 @@ export async function POST(request: NextRequest) {
     // 保存到数据库
     const client = getSupabaseClient();
     const insertedRecords = [];
+    const errors = [];
     
     for (const record of records) {
-      const warrantyPeriod = parseWarrantyPeriod(record['质保周期'] || '');
-      
-      const dbRecord = {
-        file_name: file.name,
-        file_url: fileUrl,
-        after_sales_code: record['售后编码'],
-        warranty_status: record['保修状态'],
-        factory_date: record['出厂日期'],
-        factory_number: record['出厂机号'],
-        pile_number: record['电桩编号'],
-        product_code: record['品号'],
-        device_type: record['设备类型'],
-        device_name: record['设备名称'],
-        product_model: record['产品型号'],
-        manufacturer: record['设备厂商'],
-        station_name: record['所属场站'],
-        province: record['所属省份'],
-        city: record['所属城市'],
-        district: record['所属区县'],
-        station_address: record['场站地址'],
-        customer: record['所属客户'],
-        maintainer: record['所属运维商'],
-        warranty_period: record['质保周期'],
-        warranty_start_date: warrantyPeriod.start,
-        warranty_end_date: warrantyPeriod.end,
-      };
-      
-      const { data, error } = await client
-        .from('warranty_records')
-        .insert(dbRecord)
-        .select()
-        .single();
-      
-      if (!error && data) {
-        insertedRecords.push(data);
+      try {
+        const warrantyPeriod = parseWarrantyPeriod(record['质保周期'] || '');
+        
+        const dbRecord = {
+          file_name: file.name,
+          file_url: fileUrl,
+          after_sales_code: record['售后编码'] || null,
+          warranty_status: record['保修状态'] || null,
+          factory_date: record['出厂日期'] || null,
+          factory_number: record['出厂机号'] || null,
+          pile_number: record['电桩编号'] || null,
+          product_code: record['品号'] || null,
+          device_type: record['设备类型'] || null,
+          device_name: record['设备名称'] || null,
+          product_model: record['产品型号'] || null,
+          manufacturer: record['设备厂商'] || null,
+          station_name: record['所属场站'] || null,
+          province: record['所属省份'] || null,
+          city: record['所属城市'] || null,
+          district: record['所属区县'] || null,
+          station_address: record['场站地址'] || null,
+          customer: record['所属客户'] || null,
+          maintainer: record['所属运维商'] || null,
+          warranty_period: record['质保周期'] || null,
+          warranty_start_date: warrantyPeriod.start,
+          warranty_end_date: warrantyPeriod.end,
+        };
+        
+        const { data, error } = await client
+          .from('warranty_records')
+          .insert(dbRecord)
+          .select()
+          .single();
+        
+        if (!error && data) {
+          insertedRecords.push(data);
+        } else if (error) {
+          errors.push({ record: record['售后编码'], error: error.message });
+        }
+      } catch (err) {
+        errors.push({ record: record['售后编码'], error: String(err) });
       }
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        totalRecords: records.length,
+        totalRows: jsonData.length - headerIndex - 1,
+        validRecords: records.length,
         insertedRecords: insertedRecords.length,
-        records: insertedRecords,
+        errors: errors.length,
+        errorDetails: errors.slice(0, 5), // 只返回前5个错误
+        records: insertedRecords.slice(0, 5), // 只返回前5条记录作为示例
       },
     });
   } catch (error) {
