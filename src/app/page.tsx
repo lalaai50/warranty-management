@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Search, FileText, MapPin, AlertCircle, CheckCircle, Download, Calendar, Building2, Zap, Factory } from 'lucide-react';
+import { Upload, Search, FileText, MapPin, AlertCircle, CheckCircle, Download, Calendar, Building2, Zap, Factory, Database, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface WarrantyRecord {
   id: number;
@@ -38,15 +38,61 @@ interface WarrantyRecord {
   days_remaining: number;
 }
 
+interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+interface Stats {
+  total: number;
+  inWarranty: number;
+  outOfWarranty: number;
+}
+
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('upload');
+  const [activeTab, setActiveTab] = useState('all');
   const [file, setFile] = useState<File | null>(null);
   const [searchStationName, setSearchStationName] = useState('');
-  const [records, setRecords] = useState<WarrantyRecord[]>([]);
+  const [searchResults, setSearchResults] = useState<WarrantyRecord[]>([]);
+  const [allRecords, setAllRecords] = useState<WarrantyRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [uploadStats, setUploadStats] = useState<{ total: number; inserted: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // 分页和统计
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+  const [stats, setStats] = useState<Stats>({ total: 0, inWarranty: 0, outOfWarranty: 0 });
+
+  // 加载所有数据
+  const loadAllRecords = async (page: number = 1) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/records?page=${page}&pageSize=${pagination.pageSize}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setAllRecords(result.data);
+        setPagination(result.pagination);
+        setStats(result.stats);
+      } else {
+        setMessage({ type: 'error', text: result.error || '加载失败' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: '加载数据失败' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 页面加载时获取所有数据
+  useEffect(() => {
+    if (activeTab === 'all') {
+      loadAllRecords(pagination.page);
+    }
+  }, [activeTab, pagination.page]);
 
   // 文件上传
   const handleUpload = async (e: React.FormEvent) => {
@@ -82,6 +128,8 @@ export default function Home() {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
+        // 刷新数据
+        loadAllRecords(1);
       } else {
         setMessage({ type: 'error', text: result.error || '上传失败' });
       }
@@ -109,7 +157,7 @@ export default function Home() {
       const result = await response.json();
 
       if (result.success) {
-        setRecords(result.data);
+        setSearchResults(result.data);
         if (result.data.length === 0) {
           setMessage({ type: 'error', text: '未找到相关记录' });
         }
@@ -139,6 +187,133 @@ export default function Home() {
     }
   };
 
+  // 渲染记录卡片
+  const renderRecordCard = (record: WarrantyRecord) => (
+    <Card key={record.id} className="overflow-hidden">
+      <div className={`h-1 ${
+        record.warranty_status_display === '在保' ? 'bg-green-500' : 'bg-red-500'
+      }`} />
+      <CardContent className="pt-6">
+        <div className="space-y-4">
+          {/* 状态标签 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant={record.warranty_status_display === '在保' ? 'default' : 'destructive'}
+                className="text-base px-3 py-1"
+              >
+                {record.warranty_status_display}
+              </Badge>
+              {record.warranty_status && (
+                <span className="text-sm text-gray-500">
+                  原始状态：{record.warranty_status}
+                </span>
+              )}
+            </div>
+            <span className={`text-sm font-medium ${
+              record.warranty_status_display === '在保' ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {record.days_remaining > 0 
+                ? `剩余 ${record.days_remaining} 天` 
+                : `已过期 ${Math.abs(record.days_remaining)} 天`}
+            </span>
+          </div>
+
+          {/* 场站信息 */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+            <div className="flex items-start gap-2 mb-2">
+              <Building2 className="w-4 h-4 mt-0.5 text-gray-400" />
+              <div className="flex-1">
+                <p className="text-base font-semibold text-gray-900 dark:text-white">
+                  {record.station_name}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {[record.province, record.city, record.district].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+            </div>
+            {record.station_address && (
+              <div className="flex items-start gap-2 mt-2">
+                <MapPin className="w-4 h-4 mt-0.5 text-gray-400" />
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {record.station_address}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* 设备信息 */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <span className="text-gray-500">设备名称：</span>
+              <span className="text-gray-900 dark:text-white font-medium">
+                {record.device_name || '-'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">设备类型：</span>
+              <span className="text-gray-900 dark:text-white">
+                {record.device_type || '-'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">产品型号：</span>
+              <span className="text-gray-900 dark:text-white">
+                {record.product_model || '-'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">设备厂商：</span>
+              <span className="text-gray-900 dark:text-white">
+                {record.manufacturer || '-'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">电桩编号：</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">
+                {record.pile_number || '-'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">售后编码：</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">
+                {record.after_sales_code || '-'}
+              </span>
+            </div>
+          </div>
+
+          {/* 质保信息 */}
+          <div className="border-t pt-3">
+            <div className="flex items-start gap-2">
+              <Calendar className="w-4 h-4 mt-0.5 text-gray-400" />
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  质保周期：{record.warranty_period || '-'}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  所属客户：{record.customer || '-'} | 运维商：{record.maintainer || '-'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => handleDownload(record.file_url, record.file_name)}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              下载源文件
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 pb-8">
       {/* 头部 */}
@@ -159,7 +334,11 @@ export default function Home() {
       {/* 主内容 */}
       <div className="max-w-4xl mx-auto px-4 mt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              全部数据
+            </TabsTrigger>
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
               上传 Excel
@@ -169,6 +348,80 @@ export default function Home() {
               查询质保
             </TabsTrigger>
           </TabsList>
+
+          {/* 全部数据页面 */}
+          <TabsContent value="all">
+            {/* 统计卡片 */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+                    <p className="text-sm text-gray-500">总记录数</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-green-600">{stats.inWarranty}</p>
+                    <p className="text-sm text-gray-500">在保设备</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-red-600">{stats.outOfWarranty}</p>
+                    <p className="text-sm text-gray-500">过保设备</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 数据列表 */}
+            <div className="space-y-4">
+              {allRecords.length > 0 ? (
+                <>
+                  {allRecords.map(renderRecordCard)}
+                  
+                  {/* 分页 */}
+                  {pagination.totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={pagination.page === 1}
+                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        上一页
+                      </Button>
+                      <span className="text-sm text-gray-600">
+                        第 {pagination.page} / {pagination.totalPages} 页
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={pagination.page === pagination.totalPages}
+                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                      >
+                        下一页
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Database className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500">暂无数据，请先上传 Excel 文件</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
 
           {/* 上传页面 */}
           <TabsContent value="upload">
@@ -265,139 +518,15 @@ export default function Home() {
             </Card>
 
             {/* 查询结果 */}
-            {records.length > 0 && (
+            {searchResults.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    查询结果 ({records.length} 条)
+                    查询结果 ({searchResults.length} 条)
                   </h3>
                 </div>
                 
-                {records.map((record) => (
-                  <Card key={record.id} className="overflow-hidden">
-                    <div className={`h-1 ${
-                      record.warranty_status_display === '在保' ? 'bg-green-500' : 'bg-red-500'
-                    }`} />
-                    <CardContent className="pt-6">
-                      <div className="space-y-4">
-                        {/* 状态标签 */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge 
-                              variant={record.warranty_status_display === '在保' ? 'default' : 'destructive'}
-                              className="text-base px-3 py-1"
-                            >
-                              {record.warranty_status_display}
-                            </Badge>
-                            {record.warranty_status && (
-                              <span className="text-sm text-gray-500">
-                                原始状态：{record.warranty_status}
-                              </span>
-                            )}
-                          </div>
-                          <span className={`text-sm font-medium ${
-                            record.warranty_status_display === '在保' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {record.days_remaining > 0 
-                              ? `剩余 ${record.days_remaining} 天` 
-                              : `已过期 ${Math.abs(record.days_remaining)} 天`}
-                          </span>
-                        </div>
-
-                        {/* 场站信息 */}
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                          <div className="flex items-start gap-2 mb-2">
-                            <Building2 className="w-4 h-4 mt-0.5 text-gray-400" />
-                            <div className="flex-1">
-                              <p className="text-base font-semibold text-gray-900 dark:text-white">
-                                {record.station_name}
-                              </p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {[record.province, record.city, record.district].filter(Boolean).join(' · ')}
-                              </p>
-                            </div>
-                          </div>
-                          {record.station_address && (
-                            <div className="flex items-start gap-2 mt-2">
-                              <MapPin className="w-4 h-4 mt-0.5 text-gray-400" />
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                {record.station_address}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* 设备信息 */}
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <span className="text-gray-500">设备名称：</span>
-                            <span className="text-gray-900 dark:text-white font-medium">
-                              {record.device_name || '-'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">设备类型：</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {record.device_type || '-'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">产品型号：</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {record.product_model || '-'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">设备厂商：</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {record.manufacturer || '-'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">电桩编号：</span>
-                            <span className="text-gray-900 dark:text-white font-mono text-xs">
-                              {record.pile_number || '-'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">售后编码：</span>
-                            <span className="text-gray-900 dark:text-white font-mono text-xs">
-                              {record.after_sales_code || '-'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* 质保信息 */}
-                        <div className="border-t pt-3">
-                          <div className="flex items-start gap-2">
-                            <Calendar className="w-4 h-4 mt-0.5 text-gray-400" />
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                质保周期：{record.warranty_period || '-'}
-                              </p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                所属客户：{record.customer || '-'} | 运维商：{record.maintainer || '-'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 操作按钮 */}
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => handleDownload(record.file_url, record.file_name)}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            下载源文件
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {searchResults.map(renderRecordCard)}
               </div>
             )}
           </TabsContent>
